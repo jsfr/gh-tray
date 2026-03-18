@@ -25,24 +25,80 @@ module private ThemeDetection =
         with _ ->
             false
 
+module private MenuColors =
+    let background isDark =
+        if isDark then Color.FromArgb(43, 43, 43) else Color.FromArgb(255, 255, 255)
+
+    let foreground isDark =
+        if isDark then Color.White else Color.FromArgb(30, 30, 30)
+
+    let grayText isDark =
+        if isDark then Color.FromArgb(153, 153, 153) else Color.FromArgb(109, 109, 109)
+
+    let border isDark =
+        if isDark then Color.FromArgb(60, 60, 60) else Color.FromArgb(200, 200, 200)
+
+    let separator isDark =
+        if isDark then Color.FromArgb(60, 60, 60) else Color.FromArgb(215, 215, 215)
+
+    let highlight isDark =
+        if isDark then Color.FromArgb(65, 65, 65) else Color.FromArgb(229, 243, 255)
+
+    let highlightBorder isDark =
+        if isDark then Color.FromArgb(80, 80, 80) else Color.FromArgb(204, 232, 255)
+
 type TrayApp(lifetime: IHostApplicationLifetime) =
     let contextMenu = new ContextMenuStrip()
 
-    do
-        contextMenu.Renderer <-
-            { new ToolStripProfessionalRenderer() with
-                override _.OnRenderItemText(e) =
-                    e.Graphics.TextRenderingHint <- Text.TextRenderingHint.ClearTypeGridFit
+    let createRenderer (isDark: bool) =
+        let colorTable =
+            { new ProfessionalColorTable() with
+                override _.ToolStripDropDownBackground = MenuColors.background isDark
+                override _.MenuBorder = MenuColors.border isDark
+                override _.MenuItemBorder = MenuColors.highlightBorder isDark
+                override _.MenuItemSelected = MenuColors.highlight isDark
+                override _.MenuItemPressedGradientBegin = MenuColors.highlight isDark
+                override _.MenuItemPressedGradientEnd = MenuColors.highlight isDark
+                override _.SeparatorDark = MenuColors.separator isDark
+                override _.SeparatorLight = MenuColors.separator isDark
+                override _.ImageMarginGradientBegin = MenuColors.background isDark
+                override _.ImageMarginGradientMiddle = MenuColors.background isDark
+                override _.ImageMarginGradientEnd = MenuColors.background isDark }
 
-                    match e.Item.Tag with
-                    | :? (string * string) as (prefix, title) ->
-                        let color = e.Item.ForeColor
-                        use boldFont = new Font(e.Item.Font, FontStyle.Bold)
-                        let prefixSize = TextRenderer.MeasureText(e.Graphics, prefix, boldFont)
-                        TextRenderer.DrawText(e.Graphics, prefix, boldFont, e.TextRectangle.Location, color)
-                        let titleX = e.TextRectangle.X + prefixSize.Width
-                        TextRenderer.DrawText(e.Graphics, title, e.Item.Font, Point(titleX, e.TextRectangle.Y), color)
-                    | _ -> base.OnRenderItemText(e) }
+        { new ToolStripProfessionalRenderer(colorTable) with
+            override _.OnRenderItemText(e) =
+                e.Graphics.TextRenderingHint <- Text.TextRenderingHint.ClearTypeGridFit
+
+                match e.Item.Tag with
+                | :? (string * string) as (prefix, title) ->
+                    let color = e.Item.ForeColor
+                    use boldFont = new Font(e.Item.Font, FontStyle.Bold)
+                    let prefixSize = TextRenderer.MeasureText(e.Graphics, prefix, boldFont)
+                    TextRenderer.DrawText(e.Graphics, prefix, boldFont, e.TextRectangle.Location, color)
+                    let titleX = e.TextRectangle.X + prefixSize.Width
+                    TextRenderer.DrawText(e.Graphics, title, e.Item.Font, Point(titleX, e.TextRectangle.Y), color)
+                | _ -> base.OnRenderItemText(e) }
+
+    let applyMenuTheme (isDark: bool) =
+        contextMenu.Renderer <- createRenderer isDark
+        contextMenu.BackColor <- MenuColors.background isDark
+        contextMenu.ForeColor <- MenuColors.foreground isDark
+
+        for i in 0 .. contextMenu.Items.Count - 1 do
+            let item = contextMenu.Items.[i]
+
+            match item with
+            | :? ToolStripLabel as lbl when lbl.Font.Bold ->
+                lbl.ForeColor <- MenuColors.foreground isDark
+            | :? ToolStripLabel as lbl ->
+                lbl.ForeColor <- MenuColors.grayText isDark
+            | :? ToolStripMenuItem as mi when (match mi.Tag with | :? string as s -> s = "draft" | _ -> false) ->
+                mi.ForeColor <- MenuColors.grayText isDark
+            | :? ToolStripMenuItem as mi ->
+                mi.ForeColor <- MenuColors.foreground isDark
+            | _ -> ()
+
+    do applyMenuTheme (ThemeDetection.isSystemDarkTheme ())
 
     let notifyIcon = new NotifyIcon(Visible = true, ContextMenuStrip = contextMenu)
     let marshalControl = new Control()
@@ -99,10 +155,15 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         | -1 -> nameWithOwner
         | i -> nameWithOwner.Substring(i + 1)
 
+    let isDark () =
+        match lastIsDark with
+        | Some d -> d
+        | None -> ThemeDetection.isSystemDarkTheme ()
+
     let addSectionHeader (text: string) =
         let item = new ToolStripLabel(text, IsLink = false)
         item.Font <- new Font(item.Font, FontStyle.Bold)
-        item.BackColor <- SystemColors.Control
+        item.ForeColor <- MenuColors.foreground (isDark ())
         contextMenu.Items.Add(item) |> ignore
 
     let addPrItem (pr: PullRequest) =
@@ -116,7 +177,8 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         | None -> ()
 
         if pr.IsDraft then
-            item.ForeColor <- SystemColors.GrayText
+            item.ForeColor <- MenuColors.grayText (isDark ())
+            item.Tag <- "draft" :> obj
 
         item.Click.Add(fun _ -> Process.Start(new ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
         contextMenu.Items.Add(item) |> ignore
@@ -135,6 +197,11 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         else
             action ()
 
+    let currentTheme () =
+        let isDark = ThemeDetection.isSystemDarkTheme ()
+        lastIsDark <- Some isDark
+        isDark
+
     let refreshIconIfThemeChanged () =
         let isDark = ThemeDetection.isSystemDarkTheme ()
 
@@ -143,6 +210,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         | _ ->
             lastIsDark <- Some isDark
             notifyIcon.Icon <- createIcon currentDisplayText isDark
+            applyMenuTheme isDark
+
+    let themeChangedHandler =
+        UserPreferenceChangedEventHandler(fun _ e ->
+            if e.Category = UserPreferenceCategory.General then
+                postToUiThread (fun () -> refreshIconIfThemeChanged ()))
 
     do
         notifyIcon.MouseClick.Add(fun e ->
@@ -151,16 +224,18 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             if e.Button = MouseButtons.Left then
                 showContextMenu.Invoke(notifyIcon, null) |> ignore)
 
+    do SystemEvents.UserPreferenceChanged.AddHandler(themeChangedHandler)
+
     member _.SetLoading() =
         currentDisplayText <- "..."
-        refreshIconIfThemeChanged ()
+        notifyIcon.Icon <- createIcon currentDisplayText (currentTheme ())
         notifyIcon.Text <- "gh-tray: loading..."
 
     member _.Update(group: PullRequestGroup, pollInterval: TimeSpan) =
         let doUpdate () =
             let count = PullRequestGroup.totalCount group
             currentDisplayText <- string count
-            refreshIconIfThemeChanged ()
+            notifyIcon.Icon <- createIcon currentDisplayText (currentTheme ())
             notifyIcon.Text <- $"gh-tray: {count} PRs"
 
             contextMenu.Items.Clear()
@@ -176,7 +251,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             isStale <- false
             let timestamp = now.ToString("HH:mm:ss")
             let tsItem = new ToolStripLabel($"Last updated: {timestamp}")
-            tsItem.ForeColor <- SystemColors.GrayText
+            tsItem.ForeColor <- MenuColors.grayText (isDark ())
             contextMenu.Items.Add(tsItem) |> ignore
 
             contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
@@ -204,6 +279,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
 
     interface IDisposable with
         member _.Dispose() =
+            SystemEvents.UserPreferenceChanged.RemoveHandler(themeChangedHandler)
             notifyIcon.Visible <- false
             notifyIcon.Dispose()
             contextMenu.Dispose()
