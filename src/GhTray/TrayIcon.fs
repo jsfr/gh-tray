@@ -70,7 +70,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                 e.Graphics.TextRenderingHint <- Text.TextRenderingHint.ClearTypeGridFit
 
                 match e.Item.Tag with
-                | :? (string * string) as (prefix, title) ->
+                | :? (string * string * bool) as (prefix, title, _) ->
                     let color = e.Item.ForeColor
                     use boldFont = new Font(e.Item.Font, FontStyle.Bold)
                     let prefixSize = TextRenderer.MeasureText(e.Graphics, prefix, boldFont)
@@ -92,7 +92,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                 lbl.ForeColor <- MenuColors.foreground isDark
             | :? ToolStripLabel as lbl ->
                 lbl.ForeColor <- MenuColors.grayText isDark
-            | :? ToolStripMenuItem as mi when (match mi.Tag with | :? string as s -> s = "draft" | _ -> false) ->
+            | :? ToolStripMenuItem as mi when (match mi.Tag with | :? (string * string * bool) as (_, _, d) -> d | _ -> false) ->
                 mi.ForeColor <- MenuColors.grayText isDark
             | :? ToolStripMenuItem as mi ->
                 mi.ForeColor <- MenuColors.foreground isDark
@@ -170,7 +170,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         let prefix = $"{repoName pr.Repository}#{pr.Number} "
         let title = pr.Title
         let item = new ToolStripMenuItem(prefix + title)
-        item.Tag <- (prefix, title) :> obj
+        item.Tag <- (prefix, title, pr.IsDraft) :> obj
 
         match statusImage pr with
         | Some img -> item.Image <- img
@@ -178,7 +178,6 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
 
         if pr.IsDraft then
             item.ForeColor <- MenuColors.grayText (isDark ())
-            item.Tag <- "draft" :> obj
 
         item.Click.Add(fun _ -> Process.Start(new ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
         contextMenu.Items.Add(item) |> ignore
