@@ -254,6 +254,16 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             tsItem.ForeColor <- MenuColors.grayText (isDark ())
             contextMenu.Items.Add(tsItem) |> ignore
 
+            let autoStartItem = new ToolStripMenuItem("Start with Windows")
+            autoStartItem.Checked <- AutoStart.isEnabled ()
+
+            autoStartItem.Click.Add(fun _ ->
+                let newState = not autoStartItem.Checked
+                AutoStart.setEnabled newState
+                autoStartItem.Checked <- newState)
+
+            contextMenu.Items.Add(autoStartItem) |> ignore
+
             contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
             let quitItem = new ToolStripMenuItem("Quit")
             quitItem.Click.Add(fun _ -> lifetime.StopApplication())
