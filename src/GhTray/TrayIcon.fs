@@ -8,6 +8,22 @@ open System.Drawing
 open System.Reflection
 open System.Windows.Forms
 open Microsoft.Extensions.Hosting
+open Microsoft.Win32
+
+module private ThemeDetection =
+    let isSystemDarkTheme () =
+        try
+            use key =
+                Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+
+            match key with
+            | null -> false
+            | k ->
+                match k.GetValue("SystemUsesLightTheme") with
+                | :? int as v -> v = 0
+                | _ -> false
+        with _ ->
+            false
 
 type TrayApp(lifetime: IHostApplicationLifetime) =
     let contextMenu = new ContextMenuStrip()
@@ -35,15 +51,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
     let showContextMenu =
         typeof<NotifyIcon>.GetMethod("ShowContextMenu", BindingFlags.Instance ||| BindingFlags.NonPublic)
 
-    do
-        notifyIcon.MouseClick.Add(fun e ->
-            if e.Button = MouseButtons.Left then
-                showContextMenu.Invoke(notifyIcon, null) |> ignore)
-
     let mutable lastUpdated: DateTime option = None
     let mutable isStale = false
+    let mutable lastIsDark: bool option = None
+    let mutable currentDisplayText: string = "..."
 
-    let createIcon (text: string) : Icon =
+    let createIcon (text: string) (isDark: bool) : Icon =
         let size = 32
         let bmp = new Bitmap(size, size)
         use g = Graphics.FromImage(bmp)
@@ -51,11 +64,17 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         g.TextRenderingHint <- Text.TextRenderingHint.AntiAliasGridFit
         g.Clear(Color.Transparent)
 
-        use bgBrush = new SolidBrush(Color.FromArgb(60, 60, 60))
+        let bgColor =
+            if isDark then Color.White else Color.FromArgb(60, 60, 60)
+
+        let textColor =
+            if isDark then Color.FromArgb(30, 30, 30) else Color.White
+
+        use bgBrush = new SolidBrush(bgColor)
         g.FillEllipse(bgBrush, 0, 0, size - 1, size - 1)
 
         use font = new Font("Segoe UI", 12.0f, FontStyle.Bold)
-        use textBrush = new SolidBrush(Color.White)
+        use textBrush = new SolidBrush(textColor)
         let textSize = g.MeasureString(text, font)
         let x = (float32 size - textSize.Width) / 2.0f
         let y = (float32 size - textSize.Height) / 2.0f
@@ -116,14 +135,32 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         else
             action ()
 
+    let refreshIconIfThemeChanged () =
+        let isDark = ThemeDetection.isSystemDarkTheme ()
+
+        match lastIsDark with
+        | Some d when d = isDark -> ()
+        | _ ->
+            lastIsDark <- Some isDark
+            notifyIcon.Icon <- createIcon currentDisplayText isDark
+
+    do
+        notifyIcon.MouseClick.Add(fun e ->
+            refreshIconIfThemeChanged ()
+
+            if e.Button = MouseButtons.Left then
+                showContextMenu.Invoke(notifyIcon, null) |> ignore)
+
     member _.SetLoading() =
-        notifyIcon.Icon <- createIcon "..."
+        currentDisplayText <- "..."
+        refreshIconIfThemeChanged ()
         notifyIcon.Text <- "gh-tray: loading..."
 
     member _.Update(group: PullRequestGroup, pollInterval: TimeSpan) =
         let doUpdate () =
             let count = PullRequestGroup.totalCount group
-            notifyIcon.Icon <- createIcon (string count)
+            currentDisplayText <- string count
+            refreshIconIfThemeChanged ()
             notifyIcon.Text <- $"gh-tray: {count} PRs"
 
             contextMenu.Items.Clear()
