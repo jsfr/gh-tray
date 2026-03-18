@@ -91,18 +91,27 @@ Username resolution is part of the same interface, auto-detected via `gh api use
 
 ### GitHub Query
 
-Single GraphQL query using the search: `sort:updated-desc type:pr state:open involves:{username}`. The query fetches title, URL, number, repository, draft status, check conclusions, review decisions, and mergeable state.
+Single GraphQL query using the `search` API with query string `sort:updated-desc type:pr state:open involves:{username}`. Fetches the first 100 results (no pagination — if a user has more than 100 open PRs, the count is capped). The search returns `SearchResultItemConnection` with `PullRequest` nodes.
+
+Key field selections on each `PullRequest` node:
+- `author { login }` — for classifying as "Mine"
+- `title`, `url`, `number`, `isDraft`
+- `repository { nameWithOwner }`
+- `reviewRequests(first: 10) { nodes { requestedReviewer { ... on User { login } } } }` — for classifying as "Review Requested"
+- `reviews(last: 1, states: [APPROVED, CHANGES_REQUESTED]) { nodes { state } }` — latest formal review verdict. Only a single reviewer's most recent verdict is used; no aggregation across reviewers in v1.
+- `commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }` — CI rollup status (SUCCESS, FAILURE, PENDING)
+- `mergeable` — MERGEABLE, CONFLICTING, or UNKNOWN
 
 PRs are classified client-side:
-- **Mine**: PR author login matches username
-- **Review Requested**: user is in the requested reviewers list
+- **Mine**: `author.login` matches username
+- **Review Requested**: username appears in `reviewRequests` nodes
 - **Involved**: everything else (commented, mentioned, assigned, etc.)
 
 ## Tray Icon & Menu
 
 ### Icon Display
 
-The tray icon text shows the total PR count (sum of all three groups). During loading: "...". On the very first load failure (after startup validation passed): keeps "..." until first successful fetch.
+The tray icon text shows the total PR count (sum of all three groups). During loading: "...". On the very first load failure (after startup validation passed): keeps "..." until first successful fetch. Before the first successful fetch, no timestamp line is rendered — the menu shows only section headers with "n/a".
 
 ### Context Menu Structure
 
@@ -127,9 +136,12 @@ Last updated: 14:32:05
 |--------|-------|-----------|
 | CI Success | ✅ | All checks passed |
 | CI Failure | ❌ | Any check failed |
-| CI Pending | ⏳ | Checks still running or no checks |
+| CI Pending | ⏳ | Checks still running |
+| No CI checks | (blank) | `CheckStatus = None` — no checks configured |
 | Review Approved | 👍 | Approved review |
 | Review Changes Requested | 👎 | Changes requested |
+| Review Required | (blank) | `ReviewStatus = ReviewRequired` — review requested but no verdict yet |
+| No review | (blank) | `ReviewStatus = None` — no review submitted yet |
 | Merge Conflicts | ⚔️ | Mergeable state is conflicting |
 | Draft | `[Draft]` prefix | PR is a draft |
 
@@ -168,14 +180,14 @@ Follows 12-factor: config via environment variables, no config files.
 
 ## Application Lifecycle
 
-- The generic host runs alongside the WinForms message loop via `Application.Run` (no visible form)
-- Right-click "Quit" menu item or process termination triggers `CancellationToken`
-- `NotifyIcon` is disposed on shutdown (removes icon from tray)
+- `PullRequestPoller` runs as an `IHostedService` on the host's background thread. All `NotifyIcon` and menu mutations are marshalled to the WinForms UI thread via `SynchronizationContext.Post`.
+- `Application.Run` drives the WinForms message loop on the main thread. The generic host starts on a background thread.
+- The "Quit" handler calls `IHostApplicationLifetime.StopApplication`. The host shutdown sequence disposes `NotifyIcon` before the process exits to ensure the tray icon is removed.
 
 ## Error Handling
 
 - **Startup**: `gh auth status` fails → exit with error to stderr
-- **Polling**: transient failure → log to stderr, keep last known good state, timestamp shows staleness
+- **Polling**: transient failure → log to stderr, keep last known good state. When state is stale (last successful fetch was more than one polling interval ago), prefix the timestamp line with ⚠ (e.g. "⚠ Last updated: 14:32:05")
 - **GraphQL errors**: treated as transient polling failures
 
 ## Future Considerations (Not In Scope)
