@@ -8,31 +8,33 @@ open System.Diagnostics
 open System.Text.Json
 
 module GhCli =
-    let runGh (args: string) : Async<Result<string, string>> =
-        async {
-            let psi = ProcessStartInfo("gh", args)
-            psi.RedirectStandardOutput <- true
-            psi.RedirectStandardError <- true
-            psi.UseShellExecute <- false
-            psi.CreateNoWindow <- true
+    let runGh (args: string list) : Async<Result<string, string>> = async {
+        let psi = ProcessStartInfo("gh")
 
-            use proc = Process.Start(psi)
-            let! stdout = proc.StandardOutput.ReadToEndAsync() |> Async.AwaitTask
-            let! stderr = proc.StandardError.ReadToEndAsync() |> Async.AwaitTask
-            do! proc.WaitForExitAsync() |> Async.AwaitTask
+        for arg in args do
+            psi.ArgumentList.Add(arg)
 
-            if proc.ExitCode = 0 then
-                return Ok(stdout.Trim())
-            else
-                return Error(stderr.Trim())
-        }
+        psi.RedirectStandardOutput <- true
+        psi.RedirectStandardError <- true
+        psi.UseShellExecute <- false
+        psi.CreateNoWindow <- true
 
-    let validateAuth () : Async<Result<unit, string>> =
-        async {
-            match! runGh "auth status" with
-            | Ok _ -> return Ok()
-            | Error err -> return Error err
-        }
+        use proc = Process.Start(psi)
+        let! stdout = proc.StandardOutput.ReadToEndAsync() |> Async.AwaitTask
+        let! stderr = proc.StandardError.ReadToEndAsync() |> Async.AwaitTask
+        do! proc.WaitForExitAsync() |> Async.AwaitTask
+
+        if proc.ExitCode = 0 then
+            return Ok(stdout.Trim())
+        else
+            return Error(stderr.Trim())
+    }
+
+    let validateAuth () : Async<Result<unit, string>> = async {
+        match! runGh [ "auth"; "status" ] with
+        | Ok _ -> return Ok()
+        | Error err -> return Error err
+    }
 
 module GraphQL =
     let internal query =
@@ -85,7 +87,8 @@ module GraphQL =
                 else
                     match rollup.GetProperty("state").GetString() with
                     | "SUCCESS" -> Some Success
-                    | "FAILURE" | "ERROR" -> Some Failure
+                    | "FAILURE"
+                    | "ERROR" -> Some Failure
                     | _ -> Some Pending
         with :? KeyNotFoundException ->
             None
@@ -104,8 +107,7 @@ module GraphQL =
         with :? KeyNotFoundException ->
             None
 
-    let private parseMergeable (value: string) : bool =
-        value = "CONFLICTING"
+    let private parseMergeable (value: string) : bool = value = "CONFLICTING"
 
     let private parseReviewerLogins (reviewRequests: JsonElement) : string list =
         try
@@ -132,12 +134,9 @@ module GraphQL =
                       Number = node.GetProperty("number").GetInt32()
                       Repository = node.GetProperty("repository").GetProperty("nameWithOwner").GetString()
                       IsDraft = node.GetProperty("isDraft").GetBoolean()
-                      CheckStatus =
-                        parseCheckStatus (node.GetProperty("commits").GetProperty("nodes"))
-                      ReviewStatus =
-                        parseReviewStatus (node.GetProperty("reviews").GetProperty("nodes"))
-                      HasConflicts =
-                        parseMergeable (node.GetProperty("mergeable").GetString()) }
+                      CheckStatus = parseCheckStatus (node.GetProperty("commits").GetProperty("nodes"))
+                      ReviewStatus = parseReviewStatus (node.GetProperty("reviews").GetProperty("nodes"))
+                      HasConflicts = parseMergeable (node.GetProperty("mergeable").GetString()) }
         with
         | :? KeyNotFoundException -> None
         | :? InvalidOperationException -> None
@@ -159,17 +158,16 @@ module GraphQL =
 
                 let reviewerLogins =
                     try
-                        parseReviewerLogins (
-                            node.GetProperty("reviewRequests").GetProperty("nodes")
-                        )
+                        parseReviewerLogins (node.GetProperty("reviewRequests").GetProperty("nodes"))
                     with :? KeyNotFoundException ->
                         []
 
                 if String.Equals(authorLogin, username, StringComparison.OrdinalIgnoreCase) then
                     mine <- pr :: mine
-                elif reviewerLogins
-                     |> List.exists (fun l ->
-                         String.Equals(l, username, StringComparison.OrdinalIgnoreCase)) then
+                elif
+                    reviewerLogins
+                    |> List.exists (fun l -> String.Equals(l, username, StringComparison.OrdinalIgnoreCase))
+                then
                     reviewRequested <- pr :: reviewRequested
                 else
                     involved <- pr :: involved
@@ -180,25 +178,30 @@ module GraphQL =
 
 type GhCliClient() =
     interface IGitHubClient with
-        member _.GetUsername() =
-            async {
-                match! GhCli.runGh "api user --jq .login" with
-                | Ok username -> return username
-                | Error err -> return failwith $"Failed to get GitHub username: {err}"
-            }
+        member _.GetUsername() = async {
+            match! GhCli.runGh [ "api"; "user"; "--jq"; ".login" ] with
+            | Ok username -> return username
+            | Error err -> return failwith $"Failed to get GitHub username: {err}"
+        }
 
-        member _.FetchPullRequests(username: string) =
-            async {
-                let searchQuery =
-                    $"sort:updated-desc type:pr state:open involves:{username}"
+        member _.FetchPullRequests(username: string) = async {
+            let searchQuery = $"sort:updated-desc type:pr state:open involves:{username}"
 
-                let args =
-                    $"""api graphql -f query='{GraphQL.query}' -f searchQuery='{searchQuery}'"""
+            let args =
+                [ "api"
+                  "graphql"
+                  "-f"
+                  $"query={GraphQL.query}"
+                  "-f"
+                  $"searchQuery={searchQuery}" ]
 
-                match! GhCli.runGh args with
-                | Ok json ->
-                    let doc = JsonDocument.Parse(json)
-                    let nodes = doc.RootElement.GetProperty("data").GetProperty("search").GetProperty("nodes")
-                    return GraphQL.classifyPullRequests username nodes
-                | Error err -> return failwith $"GitHub GraphQL query failed: {err}"
-            }
+            match! GhCli.runGh args with
+            | Ok json ->
+                let doc = JsonDocument.Parse(json)
+
+                let nodes =
+                    doc.RootElement.GetProperty("data").GetProperty("search").GetProperty("nodes")
+
+                return GraphQL.classifyPullRequests username nodes
+            | Error err -> return failwith $"GitHub GraphQL query failed: {err}"
+        }

@@ -1,0 +1,11 @@
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "fantomas"
+name = "fantomas"
+language = "system"
+entry = "dotnet fantomas"
+files = '\.fs$'

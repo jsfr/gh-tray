@@ -4,11 +4,14 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="FSharp.Core" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Vortice.Direct2D1" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="GitHubClient.fs" />
+    <Compile Include="EmojiRenderer.fs" />
     <Compile Include="TrayIcon.fs" />
     <Compile Include="PullRequestPoller.fs" />
     <Compile Include="Program.fs" />

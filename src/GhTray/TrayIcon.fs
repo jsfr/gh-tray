@@ -5,83 +5,114 @@ namespace GhTray
 open System
 open System.Diagnostics
 open System.Drawing
+open System.Reflection
 open System.Windows.Forms
 open Microsoft.Extensions.Hosting
 
 type TrayApp(lifetime: IHostApplicationLifetime) =
     let contextMenu = new ContextMenuStrip()
+
+    do
+        contextMenu.Renderer <-
+            { new ToolStripProfessionalRenderer() with
+                override _.OnRenderItemText(e) =
+                    e.Graphics.TextRenderingHint <- Text.TextRenderingHint.ClearTypeGridFit
+
+                    match e.Item.Tag with
+                    | :? (string * string) as (prefix, title) ->
+                        let color = e.Item.ForeColor
+                        use boldFont = new Font(e.Item.Font, FontStyle.Bold)
+                        let prefixSize = TextRenderer.MeasureText(e.Graphics, prefix, boldFont)
+                        TextRenderer.DrawText(e.Graphics, prefix, boldFont, e.TextRectangle.Location, color)
+                        let titleX = e.TextRectangle.X + prefixSize.Width
+                        TextRenderer.DrawText(e.Graphics, title, e.Item.Font, Point(titleX, e.TextRectangle.Y), color)
+                    | _ -> base.OnRenderItemText(e) }
+
     let notifyIcon = new NotifyIcon(Visible = true, ContextMenuStrip = contextMenu)
+    let marshalControl = new Control()
+    do marshalControl.CreateControl()
+
+    let showContextMenu =
+        typeof<NotifyIcon>.GetMethod("ShowContextMenu", BindingFlags.Instance ||| BindingFlags.NonPublic)
+
+    do
+        notifyIcon.MouseClick.Add(fun e ->
+            if e.Button = MouseButtons.Left then
+                showContextMenu.Invoke(notifyIcon, null) |> ignore)
+
     let mutable lastUpdated: DateTime option = None
     let mutable isStale = false
 
     let createIcon (text: string) : Icon =
-        let bmp = new Bitmap(16, 16)
+        let size = 32
+        let bmp = new Bitmap(size, size)
         use g = Graphics.FromImage(bmp)
+        g.SmoothingMode <- Drawing2D.SmoothingMode.AntiAlias
+        g.TextRenderingHint <- Text.TextRenderingHint.AntiAliasGridFit
         g.Clear(Color.Transparent)
-        use font = new Font("Segoe UI", 7.0f, FontStyle.Bold)
-        use brush = new SolidBrush(Color.White)
-        let size = g.MeasureString(text, font)
-        let x = (16.0f - size.Width) / 2.0f
-        let y = (16.0f - size.Height) / 2.0f
-        g.DrawString(text, font, brush, x, y)
-        Icon.FromHandle(bmp.GetHicon())
 
-    let formatCheckStatus (status: CheckStatus option) =
-        match status with
-        | Some Success -> "\u2705 "
-        | Some Failure -> "\u274C "
-        | Some Pending -> "\u23F3 "
-        | None -> ""
+        use bgBrush = new SolidBrush(Color.FromArgb(60, 60, 60))
+        g.FillEllipse(bgBrush, 0, 0, size - 1, size - 1)
 
-    let formatReviewStatus (status: ReviewStatus option) =
-        match status with
-        | Some Approved -> "\U0001F44D "
-        | Some ChangesRequested -> "\U0001F44E "
-        | Some ReviewRequired -> ""
-        | None -> ""
+        use font = new Font("Segoe UI", 12.0f, FontStyle.Bold)
+        use textBrush = new SolidBrush(Color.White)
+        let textSize = g.MeasureString(text, font)
+        let x = (float32 size - textSize.Width) / 2.0f
+        let y = (float32 size - textSize.Height) / 2.0f
+        g.DrawString(text, font, textBrush, x, y)
 
-    let formatConflicts (hasConflicts: bool) =
-        if hasConflicts then "\u2694\uFE0F " else ""
+        let icon = Icon.FromHandle(bmp.GetHicon())
+        icon
 
-    let formatDraft (isDraft: bool) =
-        if isDraft then "[Draft] " else ""
+    let statusImage (pr: PullRequest) : Image option =
+        match pr.IsDraft, pr.HasConflicts, pr.CheckStatus, pr.ReviewStatus with
+        | true, _, _, _ -> Some(EmojiRenderer.render "\U0001F6A7")
+        | _, true, _, _ -> Some(EmojiRenderer.render "\u2694\uFE0F")
+        | _, _, Some Failure, _ -> Some(EmojiRenderer.render "\u274C")
+        | _, _, _, Some ChangesRequested -> Some(EmojiRenderer.render "\U0001F44E")
+        | _, _, Some Pending, _ -> Some(EmojiRenderer.render "\u23F3")
+        | _, _, _, Some Approved -> Some(EmojiRenderer.render "\U0001F44D")
+        | _, _, Some Success, _ -> Some(EmojiRenderer.render "\u2705")
+        | _ -> None
 
-    let formatPrLabel (pr: PullRequest) =
-        let check = formatCheckStatus pr.CheckStatus
-        let review = formatReviewStatus pr.ReviewStatus
-        let conflicts = formatConflicts pr.HasConflicts
-        let draft = formatDraft pr.IsDraft
-        $"{check}{review}{conflicts}{pr.Repository}#{pr.Number} - {draft}{pr.Title}"
+    let repoName (nameWithOwner: string) =
+        match nameWithOwner.IndexOf('/') with
+        | -1 -> nameWithOwner
+        | i -> nameWithOwner.Substring(i + 1)
 
     let addSectionHeader (text: string) =
-        let item = new ToolStripMenuItem(text, Enabled = false)
+        let item = new ToolStripLabel(text, IsLink = false)
         item.Font <- new Font(item.Font, FontStyle.Bold)
+        item.BackColor <- SystemColors.Control
         contextMenu.Items.Add(item) |> ignore
 
     let addPrItem (pr: PullRequest) =
-        let label = formatPrLabel pr
-        let item = new ToolStripMenuItem(label)
-        item.Click.Add(fun _ ->
-            Process.Start(new ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
+        let prefix = $"{repoName pr.Repository}#{pr.Number} "
+        let title = pr.Title
+        let item = new ToolStripMenuItem(prefix + title)
+        item.Tag <- (prefix, title) :> obj
+
+        match statusImage pr with
+        | Some img -> item.Image <- img
+        | None -> ()
+
+        if pr.IsDraft then
+            item.ForeColor <- SystemColors.GrayText
+
+        item.Click.Add(fun _ -> Process.Start(new ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
         contextMenu.Items.Add(item) |> ignore
 
     let addSection (header: string) (prs: PullRequest list) =
-        addSectionHeader header
-        contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
-
         match prs with
-        | [] ->
-            let item = new ToolStripMenuItem("  n/a", Enabled = false)
-            contextMenu.Items.Add(item) |> ignore
-        | _ -> prs |> List.iter addPrItem
+        | [] -> ()
+        | _ ->
+            addSectionHeader header
+            contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
+            prs |> List.iter addPrItem
 
     let postToUiThread (action: unit -> unit) =
-        let ctx = System.Threading.SynchronizationContext.Current
-
-        if ctx <> null then
-            ctx.Post((fun _ -> action ()), null)
-        else if notifyIcon.ContextMenuStrip <> null then
-            notifyIcon.ContextMenuStrip.Invoke(Action(action)) |> ignore
+        if marshalControl.InvokeRequired then
+            marshalControl.BeginInvoke(Action(action)) |> ignore
         else
             action ()
 
@@ -107,7 +138,8 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             lastUpdated <- Some now
             isStale <- false
             let timestamp = now.ToString("HH:mm:ss")
-            let tsItem = new ToolStripMenuItem($"Last updated: {timestamp}", Enabled = false)
+            let tsItem = new ToolStripLabel($"Last updated: {timestamp}")
+            tsItem.ForeColor <- SystemColors.GrayText
             contextMenu.Items.Add(tsItem) |> ignore
 
             contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
@@ -138,3 +170,4 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             notifyIcon.Visible <- false
             notifyIcon.Dispose()
             contextMenu.Dispose()
+            marshalControl.Dispose()

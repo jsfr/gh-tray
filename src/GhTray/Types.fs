@@ -36,8 +36,7 @@ module PullRequestGroup =
         + List.length group.ReviewRequested
         + List.length group.Involved
 
-type PollerOptions =
-    { PollInterval: System.TimeSpan }
+type PollerOptions = { PollInterval: System.TimeSpan }
 
 type IGitHubClient =
     abstract member GetUsername: unit -> Async<string>
