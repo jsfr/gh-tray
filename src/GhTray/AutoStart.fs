@@ -1,6 +1,5 @@
 namespace GhTray
 
-#nowarn "3261"
 
 open System
 open Microsoft.Win32
@@ -15,7 +14,7 @@ module AutoStart =
 
             match key with
             | null -> false
-            | k -> k.GetValue(valueName) <> null
+            | k -> not (isNull (k.GetValue(valueName)))
         with _ ->
             false
 
@@ -27,8 +26,9 @@ module AutoStart =
             | null -> ()
             | k ->
                 if enabled then
-                    let exePath = Environment.ProcessPath
-                    k.SetValue(valueName, exePath)
+                    match Environment.ProcessPath |> Option.ofObj with
+                    | Some exePath -> k.SetValue(valueName, exePath)
+                    | None -> ()
                 else
                     k.DeleteValue(valueName, false)
         with _ ->

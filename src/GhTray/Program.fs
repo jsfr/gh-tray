@@ -8,12 +8,12 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 
 module Program =
-    [<DllImport("kernel32.dll")>]
-    extern bool private AttachConsole(int dwProcessId)
+    [<DllImport("kernel32.dll", EntryPoint = "AttachConsole")>]
+    extern bool private attachConsole(int dwProcessId)
 
     [<EntryPoint; STAThread>]
     let main _argv =
-        AttachConsole(-1) |> ignore // attach to parent console for log output
+        attachConsole (-1) |> ignore // attach to parent console for log output
 
         let authResult = GhCli.validateAuth () |> Async.RunSynchronously
 
@@ -56,7 +56,7 @@ module Program =
                         logging.AddConsole() |> ignore
                         logging.SetMinimumLevel(logLevel) |> ignore)
                     .ConfigureServices(fun services ->
-                        services.AddSingleton<IGitHubClient>(new GhCliClient()) |> ignore
+                        services.AddSingleton<IGitHubClient>(GhCliClient()) |> ignore
                         services.AddSingleton<TrayApp>() |> ignore
                         services.AddSingleton<PollerOptions>({ PollInterval = pollInterval }) |> ignore
                         services.AddSingleton<PullRequestPoller>() |> ignore

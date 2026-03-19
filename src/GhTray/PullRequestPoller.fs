@@ -19,25 +19,25 @@ type PullRequestPoller(client: IGitHubClient, tray: TrayApp, logger: ILogger<Pul
             username <- name
             eprintfn "[gh-tray] Polling PRs for user: %s" username
 
-            let _ =
-                Task.Run(
-                    Func<Task>(fun () -> task {
-                        while not ct.IsCancellationRequested do
-                            try
-                                eprintfn "[gh-tray] Fetching PRs..."
-                                let! group = client.FetchPullRequests(username) |> Async.StartAsTask
+            Task.Run(
+                Func<Task>(fun () -> task {
+                    while not ct.IsCancellationRequested do
+                        try
+                            eprintfn "[gh-tray] Fetching PRs..."
+                            let! group = client.FetchPullRequests(username) |> Async.StartAsTask
 
-                                let count = PullRequestGroup.totalCount group
-                                eprintfn "[gh-tray] Fetched %d PRs" count
-                                tray.Update(group, pollInterval)
-                            with ex ->
-                                eprintfn "[gh-tray] Failed to fetch PRs: %s" ex.Message
-                                tray.MarkStale()
+                            let count = PullRequestGroup.totalCount group
+                            eprintfn "[gh-tray] Fetched %d PRs" count
+                            tray.Update(group, pollInterval)
+                        with ex ->
+                            eprintfn "[gh-tray] Failed to fetch PRs: %s" ex.Message
+                            tray.MarkStale()
 
-                            do! Task.Delay(pollInterval, ct).ContinueWith(fun _ -> ())
-                    }),
-                    ct
-                )
+                        do! Task.Delay(pollInterval, ct).ContinueWith(fun _ -> ())
+                }),
+                ct
+            )
+            |> ignore
 
             return ()
         }

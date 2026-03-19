@@ -6,19 +6,19 @@ open System.Windows.Forms
 
 module HotKeyParser =
     [<Literal>]
-    let private MOD_ALT = 0x0001u
+    let private ModAlt = 0x0001u
 
     [<Literal>]
-    let private MOD_CONTROL = 0x0002u
+    let private ModControl = 0x0002u
 
     [<Literal>]
-    let private MOD_SHIFT = 0x0004u
+    let private ModShift = 0x0004u
 
     [<Literal>]
-    let private MOD_WIN = 0x0008u
+    let private ModWin = 0x0008u
 
     [<Literal>]
-    let private MOD_NOREPEAT = 0x4000u
+    let private ModNorepeat = 0x4000u
 
     let tryParse (hotkey: string) : (uint32 * Keys) option =
         let parts =
@@ -29,18 +29,18 @@ module HotKeyParser =
         if parts.Length < 2 then
             None
         else
-            let mutable modifiers = MOD_NOREPEAT
+            let mutable modifiers = ModNorepeat
             let mutable key = Keys.None
             let mutable valid = true
 
             for i in 0 .. parts.Length - 2 do
                 match parts.[i].ToLowerInvariant() with
                 | "ctrl"
-                | "control" -> modifiers <- modifiers ||| MOD_CONTROL
-                | "alt" -> modifiers <- modifiers ||| MOD_ALT
-                | "shift" -> modifiers <- modifiers ||| MOD_SHIFT
+                | "control" -> modifiers <- modifiers ||| ModControl
+                | "alt" -> modifiers <- modifiers ||| ModAlt
+                | "shift" -> modifiers <- modifiers ||| ModShift
                 | "win"
-                | "windows" -> modifiers <- modifiers ||| MOD_WIN
+                | "windows" -> modifiers <- modifiers ||| ModWin
                 | _ -> valid <- false
 
             let keyPart = parts.[parts.Length - 1]
@@ -55,17 +55,17 @@ module HotKeyParser =
                 else
                     valid <- false
 
-            if valid && key <> Keys.None && modifiers <> MOD_NOREPEAT then
+            if valid && key <> Keys.None && modifiers <> ModNorepeat then
                 Some(modifiers, key)
             else
                 None
 
 module private NativeHotKey =
     [<Literal>]
-    let WM_HOTKEY = 0x0312
+    let WmHotkey = 0x0312
 
     [<Literal>]
-    let HOTKEY_ID = 1
+    let HotkeyId = 1
 
     [<DllImport("user32.dll", SetLastError = true)>]
     extern bool RegisterHotKey(IntPtr hWnd, int id, uint32 fsModifiers, uint32 vk)
@@ -79,14 +79,14 @@ type GlobalHotKey(modifiers: uint32, key: Keys, callback: unit -> unit) =
     let mutable registered = false
 
     do
-        base.CreateHandle(new CreateParams())
+        base.CreateHandle(CreateParams())
 
-        registered <- NativeHotKey.RegisterHotKey(base.Handle, NativeHotKey.HOTKEY_ID, modifiers, uint32 key)
+        registered <- NativeHotKey.RegisterHotKey(base.Handle, NativeHotKey.HotkeyId, modifiers, uint32 key)
 
     member _.IsRegistered = registered
 
     override _.WndProc(m) =
-        if m.Msg = NativeHotKey.WM_HOTKEY && int m.WParam = NativeHotKey.HOTKEY_ID then
+        if m.Msg = NativeHotKey.WmHotkey && int m.WParam = NativeHotKey.HotkeyId then
             callback ()
         else
             base.WndProc(&m)
@@ -94,7 +94,7 @@ type GlobalHotKey(modifiers: uint32, key: Keys, callback: unit -> unit) =
     interface IDisposable with
         member this.Dispose() =
             if registered then
-                NativeHotKey.UnregisterHotKey(this.Handle, NativeHotKey.HOTKEY_ID) |> ignore
+                NativeHotKey.UnregisterHotKey(this.Handle, NativeHotKey.HotkeyId) |> ignore
 
                 registered <- false
 

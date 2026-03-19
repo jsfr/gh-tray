@@ -1,6 +1,5 @@
 namespace GhTray
 
-#nowarn "3261"
 
 open System
 open System.Collections.Generic
@@ -19,15 +18,18 @@ module GhCli =
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
 
-        use proc = Process.Start(psi)
-        let! stdout = proc.StandardOutput.ReadToEndAsync() |> Async.AwaitTask
-        let! stderr = proc.StandardError.ReadToEndAsync() |> Async.AwaitTask
-        do! proc.WaitForExitAsync() |> Async.AwaitTask
+        match Process.Start(psi) with
+        | null -> return Error "Failed to start gh process"
+        | proc ->
+            use proc = proc
+            let! stdout = proc.StandardOutput.ReadToEndAsync() |> Async.AwaitTask
+            let! stderr = proc.StandardError.ReadToEndAsync() |> Async.AwaitTask
+            do! proc.WaitForExitAsync() |> Async.AwaitTask
 
-        if proc.ExitCode = 0 then
-            return Ok(stdout.Trim())
-        else
-            return Error(stderr.Trim())
+            if proc.ExitCode = 0 then
+                return Ok(stdout.Trim())
+            else
+                return Error(stderr.Trim())
     }
 
     let validateAuth () : Async<Result<unit, string>> = async {
@@ -85,11 +87,12 @@ module GraphQL =
                 if rollup.ValueKind = JsonValueKind.Null then
                     None
                 else
-                    match rollup.GetProperty("state").GetString() with
-                    | "SUCCESS" -> Some Success
-                    | "FAILURE"
-                    | "ERROR" -> Some Failure
-                    | _ -> Some Pending
+                    match rollup.GetProperty("state").GetString() |> Option.ofObj with
+                    | Some "SUCCESS" -> Some Success
+                    | Some "FAILURE"
+                    | Some "ERROR" -> Some Failure
+                    | Some _ -> Some Pending
+                    | None -> None
         with :? KeyNotFoundException ->
             None
 
@@ -100,9 +103,9 @@ module GraphQL =
             match node with
             | None -> None
             | Some n ->
-                match n.GetProperty("state").GetString() with
-                | "APPROVED" -> Some Approved
-                | "CHANGES_REQUESTED" -> Some ChangesRequested
+                match n.GetProperty("state").GetString() |> Option.ofObj with
+                | Some "APPROVED" -> Some Approved
+                | Some "CHANGES_REQUESTED" -> Some ChangesRequested
                 | _ -> None
         with :? KeyNotFoundException ->
             None
@@ -116,27 +119,41 @@ module GraphQL =
 
                   if reviewer.ValueKind <> JsonValueKind.Null then
                       match reviewer.TryGetProperty("login") with
-                      | true, login -> login.GetString()
+                      | true, login ->
+                          match login.GetString() |> Option.ofObj with
+                          | Some s -> s
+                          | None -> ()
                       | _ -> () ]
         with :? KeyNotFoundException ->
             []
 
     let private parsePullRequest (node: JsonElement) : PullRequest option =
         try
-            let title = node.GetProperty("title").GetString()
+            match node.GetProperty("title").GetString() |> Option.ofObj with
+            | None -> None
+            | Some title ->
+                let url =
+                    node.GetProperty("url").GetString() |> Option.ofObj |> Option.defaultValue ""
 
-            if isNull title then
-                None
-            else
+                let repo =
+                    node.GetProperty("repository").GetProperty("nameWithOwner").GetString()
+                    |> Option.ofObj
+                    |> Option.defaultValue ""
+
+                let mergeable =
+                    node.GetProperty("mergeable").GetString()
+                    |> Option.ofObj
+                    |> Option.defaultValue ""
+
                 Some
                     { Title = title
-                      Url = node.GetProperty("url").GetString()
+                      Url = url
                       Number = node.GetProperty("number").GetInt32()
-                      Repository = node.GetProperty("repository").GetProperty("nameWithOwner").GetString()
+                      Repository = repo
                       IsDraft = node.GetProperty("isDraft").GetBoolean()
                       CheckStatus = parseCheckStatus (node.GetProperty("commits").GetProperty("nodes"))
                       ReviewStatus = parseReviewStatus (node.GetProperty("reviews").GetProperty("nodes"))
-                      HasConflicts = parseMergeable (node.GetProperty("mergeable").GetString()) }
+                      HasConflicts = parseMergeable mergeable }
         with
         | :? KeyNotFoundException -> None
         | :? InvalidOperationException -> None
@@ -153,6 +170,8 @@ module GraphQL =
                 let authorLogin =
                     try
                         node.GetProperty("author").GetProperty("login").GetString()
+                        |> Option.ofObj
+                        |> Option.defaultValue ""
                     with :? KeyNotFoundException ->
                         ""
 
@@ -185,15 +204,15 @@ type GhCliClient() =
         }
 
         member _.FetchPullRequests(username: string) = async {
-            let searchQuery = $"sort:updated-desc type:pr state:open involves:{username}"
+            let searchQuery = $"sort:updated-desc type:pr state:open involves:%s{username}"
 
             let args =
                 [ "api"
                   "graphql"
                   "-f"
-                  $"query={GraphQL.query}"
+                  $"query=%s{GraphQL.query}"
                   "-f"
-                  $"searchQuery={searchQuery}" ]
+                  $"searchQuery=%s{searchQuery}" ]
 
             match! GhCli.runGh args with
             | Ok json ->

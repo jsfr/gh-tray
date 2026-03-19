@@ -1,6 +1,5 @@
 namespace GhTray
 
-#nowarn "3261"
 
 open System
 open System.Diagnostics
@@ -141,6 +140,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
 
     let showContextMenu =
         typeof<NotifyIcon>.GetMethod("ShowContextMenu", BindingFlags.Instance ||| BindingFlags.NonPublic)
+        |> Option.ofObj
 
     let mutable lastUpdated: DateTime option = None
     let mutable isStale = false
@@ -200,7 +200,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         contextMenu.Items.Add(item) |> ignore
 
     let addPrItem (pr: PullRequest) =
-        let prefix = $"{repoName pr.Repository}#{pr.Number} "
+        let prefix = $"%s{repoName pr.Repository}#%d{pr.Number} "
         let title = pr.Title
         let item = new ToolStripMenuItem(prefix + title)
         item.Tag <- (prefix, title, pr.IsDraft) :> obj
@@ -212,7 +212,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         if pr.IsDraft then
             item.ForeColor <- MenuColors.grayText (isDark ())
 
-        item.Click.Add(fun _ -> Process.Start(new ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
+        item.Click.Add(fun _ -> Process.Start(ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
         contextMenu.Items.Add(item) |> ignore
 
     let addSection (header: string) (prs: PullRequest list) =
@@ -254,7 +254,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             refreshIconIfThemeChanged ()
 
             if e.Button = MouseButtons.Left then
-                showContextMenu.Invoke(notifyIcon, null) |> ignore)
+                showContextMenu |> Option.iter (fun m -> m.Invoke(notifyIcon, null) |> ignore))
 
     do SystemEvents.UserPreferenceChanged.AddHandler(themeChangedHandler)
 
@@ -266,9 +266,9 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
     member _.Update(group: PullRequestGroup, pollInterval: TimeSpan) =
         let doUpdate () =
             let count = PullRequestGroup.totalCount group
-            currentDisplayText <- string count
+            currentDisplayText <- (string: int -> string) count
             notifyIcon.Icon <- createIcon currentDisplayText (currentTheme ())
-            notifyIcon.Text <- $"gh-tray: {count} PRs"
+            notifyIcon.Text <- $"gh-tray: %d{count} PRs"
 
             contextMenu.Items.Clear()
 
@@ -282,7 +282,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             lastUpdated <- Some now
             isStale <- false
             let timestamp = now.ToString("HH:mm:ss")
-            let tsItem = new ToolStripLabel($"Last updated: {timestamp}")
+            let tsItem = new ToolStripLabel($"Last updated: %s{timestamp}")
             tsItem.ForeColor <- MenuColors.grayText (isDark ())
             contextMenu.Items.Add(tsItem) |> ignore
 
@@ -312,9 +312,11 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                 for i in 0 .. contextMenu.Items.Count - 1 do
                     let item = contextMenu.Items.[i]
 
-                    if item.Text <> null && item.Text.StartsWith("Last updated:") then
+                    match item.Text |> Option.ofObj with
+                    | Some text when text.StartsWith("Last updated:", StringComparison.Ordinal) ->
                         let timeStr = ts.ToString("HH:mm:ss")
-                        item.Text <- $"\u26A0 Last updated: {timeStr}"
+                        item.Text <- $"\u26A0 Last updated: %s{timeStr}"
+                    | _ -> ()
             | _ -> ()
 
         postToUiThread doMarkStale
