@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.x
+
+      - name: Setup just
+        uses: extractions/setup-just@v2
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: just restore
+
+      - name: Check
+        run: just check
+
+      - name: Build
+        run: just build
