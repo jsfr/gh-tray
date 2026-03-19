@@ -20,4 +20,17 @@
     <Compile Include="PullRequestPoller.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+  <ItemGroup Label="Analyzers">
+    <PackageReference Include="G-Research.FSharp.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="FSharp.Analyzers.Build">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>build</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <PropertyGroup Label="Analyzers">
+    <FSharpAnalyzersOtherFlags>--analyzers-path &quot;$(PkgG-Research_FSharp_Analyzers)/analyzers/dotnet/fs&quot; --report &quot;$(MSBuildProjectName)-$(TargetFramework).sarif&quot;</FSharpAnalyzersOtherFlags>
+  </PropertyGroup>
 </Project>

@@ -8,4 +8,8 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
     <PackageVersion Include="Vortice.Direct2D1" Version="3.8.3" />
   </ItemGroup>
+  <ItemGroup Label="Analyzers">
+    <PackageVersion Include="G-Research.FSharp.Analyzers" Version="0.22.0" />
+    <PackageVersion Include="FSharp.Analyzers.Build" Version="0.3.0" />
+  </ItemGroup>
 </Project>
