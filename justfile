@@ -22,9 +22,20 @@ run:
 fmt:
     dotnet fantomas src/
 
+# Check formatting, lint, and run analyzers
+check: check-fmt lint analyze
+
 # Check formatting without modifying files
-check:
+check-fmt:
     dotnet fantomas --check src/
+
+# Lint F# source files
+lint:
+    dotnet dotnet-fsharplint lint GhTray.slnx
+
+# Run F# analyzers
+analyze:
+    dotnet msbuild "{{ project }}/GhTray.fsproj" "-t:AnalyzeFSharpProject"
 
 # Publish self-contained single-file exe
 publish version="0.0.0-dev":
