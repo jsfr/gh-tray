@@ -30,6 +30,10 @@ check:
 publish version="0.0.0-dev":
     dotnet publish {{ project }} -c {{ config }} --self-contained -r {{ rid }} -p:PublishSingleFile=true -p:InformationalVersion={{ version }}
 
+# Generate changelog
+changelog:
+    git cliff -o CHANGELOG.md
+
 # Publish to a specific output directory
 publish-to output version="0.0.0-dev":
     dotnet publish {{ project }} -c {{ config }} --self-contained -r {{ rid }} -p:PublishSingleFile=true -p:InformationalVersion={{ version }} -o {{ output }}
