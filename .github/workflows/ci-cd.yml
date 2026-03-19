@@ -66,6 +66,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -78,4 +89,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: gh-tray-win-x64.exe
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.content }}
