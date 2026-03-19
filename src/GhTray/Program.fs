@@ -74,11 +74,33 @@ module Program =
             let tray = host.Services.GetRequiredService<TrayApp>()
             tray.SetLoading()
 
+            let hotkeyBinding =
+                match Environment.GetEnvironmentVariable("GH_TRAY_HOTKEY") with
+                | null -> "Ctrl+Alt+Shift+G"
+                | v -> v
+
+            let globalHotKey =
+                match HotKeyParser.tryParse hotkeyBinding with
+                | Some(modifiers, key) ->
+                    let hk = new GlobalHotKey(modifiers, key, tray.ShowMenuAtCursor)
+
+                    if hk.IsRegistered then
+                        eprintfn "Global hotkey registered: %s" hotkeyBinding
+                        Some(hk :> IDisposable)
+                    else
+                        eprintfn "Failed to register global hotkey: %s (already in use?)" hotkeyBinding
+                        (hk :> IDisposable).Dispose()
+                        None
+                | None ->
+                    eprintfn "Invalid hotkey binding: %s" hotkeyBinding
+                    None
+
             let hostTask = host.RunAsync()
 
             Application.Run()
 
             hostTask.GetAwaiter().GetResult()
 
+            globalHotKey |> Option.iter (fun hk -> hk.Dispose())
             (tray :> IDisposable).Dispose()
             0

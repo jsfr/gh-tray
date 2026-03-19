@@ -6,9 +6,14 @@ open System
 open System.Diagnostics
 open System.Drawing
 open System.Reflection
+open System.Runtime.InteropServices
 open System.Windows.Forms
 open Microsoft.Extensions.Hosting
 open Microsoft.Win32
+
+module private NativeMenu =
+    [<DllImport("user32.dll")>]
+    extern bool SetForegroundWindow(IntPtr hWnd)
 
 module private ThemeDetection =
     let isSystemDarkTheme () =
@@ -66,7 +71,7 @@ module private MenuColors =
             Color.FromArgb(204, 232, 255)
 
 type TrayApp(lifetime: IHostApplicationLifetime) =
-    let contextMenu = new ContextMenuStrip()
+    let contextMenu = new ContextMenuStrip(AutoClose = true)
 
     let createRenderer (isDark: bool) =
         let colorTable =
@@ -118,6 +123,17 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             | _ -> ()
 
     do applyMenuTheme (ThemeDetection.isSystemDarkTheme ())
+
+    do
+        contextMenu.KeyDown.Add(fun e ->
+            match e.KeyCode with
+            | Keys.J ->
+                e.Handled <- true
+                SendKeys.SendWait("{DOWN}")
+            | Keys.K ->
+                e.Handled <- true
+                SendKeys.SendWait("{UP}")
+            | _ -> ())
 
     let notifyIcon = new NotifyIcon(Visible = true, ContextMenuStrip = contextMenu)
     let marshalControl = new Control()
@@ -302,6 +318,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             | _ -> ()
 
         postToUiThread doMarkStale
+
+    member _.ShowMenuAtCursor() =
+        postToUiThread (fun () ->
+            refreshIconIfThemeChanged ()
+            NativeMenu.SetForegroundWindow(marshalControl.Handle) |> ignore
+            contextMenu.Show(Cursor.Position))
 
     interface IDisposable with
         member _.Dispose() =

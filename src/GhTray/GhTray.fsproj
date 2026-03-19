@@ -15,6 +15,7 @@
     <Compile Include="GitHubClient.fs" />
     <Compile Include="EmojiRenderer.fs" />
     <Compile Include="AutoStart.fs" />
+    <Compile Include="HotKey.fs" />
     <Compile Include="TrayIcon.fs" />
     <Compile Include="PullRequestPoller.fs" />
     <Compile Include="Program.fs" />
