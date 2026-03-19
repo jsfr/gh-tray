@@ -18,11 +18,17 @@ jobs:
         with:
           dotnet-version: 10.x
 
-      - name: Restore
-        run: dotnet restore
+      - name: Setup just
+        uses: extractions/setup-just@v2
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Check formatting
+        run: just check
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: just build
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -36,19 +42,16 @@ jobs:
         with:
           dotnet-version: 10.x
 
+      - name: Setup just
+        uses: extractions/setup-just@v2
+
       - name: Determine version
         id: version
         shell: bash
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Publish
-        run: >
-          dotnet publish src/GhTray
-          -c Release
-          --self-contained
-          -r win-x64
-          -p:PublishSingleFile=true
-          -p:InformationalVersion=${{ steps.version.outputs.version }}
+        run: just publish ${{ steps.version.outputs.version }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

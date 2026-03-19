@@ -27,25 +27,43 @@ module private ThemeDetection =
 
 module private MenuColors =
     let background isDark =
-        if isDark then Color.FromArgb(43, 43, 43) else Color.FromArgb(255, 255, 255)
+        if isDark then
+            Color.FromArgb(43, 43, 43)
+        else
+            Color.FromArgb(255, 255, 255)
 
     let foreground isDark =
         if isDark then Color.White else Color.FromArgb(30, 30, 30)
 
     let grayText isDark =
-        if isDark then Color.FromArgb(153, 153, 153) else Color.FromArgb(109, 109, 109)
+        if isDark then
+            Color.FromArgb(153, 153, 153)
+        else
+            Color.FromArgb(109, 109, 109)
 
     let border isDark =
-        if isDark then Color.FromArgb(60, 60, 60) else Color.FromArgb(200, 200, 200)
+        if isDark then
+            Color.FromArgb(60, 60, 60)
+        else
+            Color.FromArgb(200, 200, 200)
 
     let separator isDark =
-        if isDark then Color.FromArgb(60, 60, 60) else Color.FromArgb(215, 215, 215)
+        if isDark then
+            Color.FromArgb(60, 60, 60)
+        else
+            Color.FromArgb(215, 215, 215)
 
     let highlight isDark =
-        if isDark then Color.FromArgb(65, 65, 65) else Color.FromArgb(229, 243, 255)
+        if isDark then
+            Color.FromArgb(65, 65, 65)
+        else
+            Color.FromArgb(229, 243, 255)
 
     let highlightBorder isDark =
-        if isDark then Color.FromArgb(80, 80, 80) else Color.FromArgb(204, 232, 255)
+        if isDark then
+            Color.FromArgb(80, 80, 80)
+        else
+            Color.FromArgb(204, 232, 255)
 
 type TrayApp(lifetime: IHostApplicationLifetime) =
     let contextMenu = new ContextMenuStrip()
@@ -88,14 +106,15 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             let item = contextMenu.Items.[i]
 
             match item with
-            | :? ToolStripLabel as lbl when lbl.Font.Bold ->
-                lbl.ForeColor <- MenuColors.foreground isDark
-            | :? ToolStripLabel as lbl ->
-                lbl.ForeColor <- MenuColors.grayText isDark
-            | :? ToolStripMenuItem as mi when (match mi.Tag with | :? (string * string * bool) as (_, _, d) -> d | _ -> false) ->
+            | :? ToolStripLabel as lbl when lbl.Font.Bold -> lbl.ForeColor <- MenuColors.foreground isDark
+            | :? ToolStripLabel as lbl -> lbl.ForeColor <- MenuColors.grayText isDark
+            | :? ToolStripMenuItem as mi when
+                (match mi.Tag with
+                 | :? (string * string * bool) as (_, _, d) -> d
+                 | _ -> false)
+                ->
                 mi.ForeColor <- MenuColors.grayText isDark
-            | :? ToolStripMenuItem as mi ->
-                mi.ForeColor <- MenuColors.foreground isDark
+            | :? ToolStripMenuItem as mi -> mi.ForeColor <- MenuColors.foreground isDark
             | _ -> ()
 
     do applyMenuTheme (ThemeDetection.isSystemDarkTheme ())
@@ -120,11 +139,9 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         g.TextRenderingHint <- Text.TextRenderingHint.AntiAliasGridFit
         g.Clear(Color.Transparent)
 
-        let bgColor =
-            if isDark then Color.White else Color.FromArgb(60, 60, 60)
+        let bgColor = if isDark then Color.White else Color.FromArgb(60, 60, 60)
 
-        let textColor =
-            if isDark then Color.FromArgb(30, 30, 30) else Color.White
+        let textColor = if isDark then Color.FromArgb(30, 30, 30) else Color.White
 
         use bgBrush = new SolidBrush(bgColor)
         g.FillEllipse(bgBrush, 0, 0, size - 1, size - 1)

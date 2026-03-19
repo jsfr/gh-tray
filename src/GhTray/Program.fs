@@ -67,7 +67,9 @@ module Program =
                     .Build()
 
             let lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>()
-            lifetime.ApplicationStopping.Register(fun () -> Application.ExitThread()) |> ignore
+
+            lifetime.ApplicationStopping.Register(fun () -> Application.ExitThread())
+            |> ignore
 
             let tray = host.Services.GetRequiredService<TrayApp>()
             tray.SetLoading()
