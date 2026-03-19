@@ -24,6 +24,9 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
+      - name: Restore
+        run: just restore
+
       - name: Check
         run: just check
 
