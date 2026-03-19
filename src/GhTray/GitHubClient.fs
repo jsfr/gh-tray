@@ -8,17 +8,17 @@ open System.Text.Json
 
 module GhCli =
     let runGh (args: string list) : Async<Result<string, string>> = async {
-        let psi = ProcessStartInfo("gh")
+        let psi = ProcessStartInfo "gh"
 
         for arg in args do
-            psi.ArgumentList.Add(arg)
+            psi.ArgumentList.Add arg
 
         psi.RedirectStandardOutput <- true
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
 
-        match Process.Start(psi) with
+        match Process.Start psi with
         | null -> return Error "Failed to start gh process"
         | proc ->
             use proc = proc
@@ -82,7 +82,7 @@ module GraphQL =
             match node with
             | None -> None
             | Some n ->
-                let rollup = n.GetProperty("commit").GetProperty("statusCheckRollup")
+                let rollup = n.GetProperty("commit").GetProperty "statusCheckRollup"
 
                 if rollup.ValueKind = JsonValueKind.Null then
                     None
@@ -115,10 +115,10 @@ module GraphQL =
     let private parseReviewerLogins (reviewRequests: JsonElement) : string list =
         try
             [ for node in reviewRequests.EnumerateArray() do
-                  let reviewer = node.GetProperty("requestedReviewer")
+                  let reviewer = node.GetProperty "requestedReviewer"
 
                   if reviewer.ValueKind <> JsonValueKind.Null then
-                      match reviewer.TryGetProperty("login") with
+                      match reviewer.TryGetProperty "login" with
                       | true, login ->
                           match login.GetString() |> Option.ofObj with
                           | Some s -> s
@@ -151,8 +151,8 @@ module GraphQL =
                       Number = node.GetProperty("number").GetInt32()
                       Repository = repo
                       IsDraft = node.GetProperty("isDraft").GetBoolean()
-                      CheckStatus = parseCheckStatus (node.GetProperty("commits").GetProperty("nodes"))
-                      ReviewStatus = parseReviewStatus (node.GetProperty("reviews").GetProperty("nodes"))
+                      CheckStatus = parseCheckStatus (node.GetProperty("commits").GetProperty "nodes")
+                      ReviewStatus = parseReviewStatus (node.GetProperty("reviews").GetProperty "nodes")
                       HasConflicts = parseMergeable mergeable }
         with
         | :? KeyNotFoundException -> None
@@ -177,7 +177,7 @@ module GraphQL =
 
                 let reviewerLogins =
                     try
-                        parseReviewerLogins (node.GetProperty("reviewRequests").GetProperty("nodes"))
+                        parseReviewerLogins (node.GetProperty("reviewRequests").GetProperty "nodes")
                     with :? KeyNotFoundException ->
                         []
 
@@ -216,10 +216,10 @@ type GhCliClient() =
 
             match! GhCli.runGh args with
             | Ok json ->
-                let doc = JsonDocument.Parse(json)
+                let doc = JsonDocument.Parse json
 
                 let nodes =
-                    doc.RootElement.GetProperty("data").GetProperty("search").GetProperty("nodes")
+                    doc.RootElement.GetProperty("data").GetProperty("search").GetProperty "nodes"
 
                 return GraphQL.classifyPullRequests username nodes
             | Error err -> return failwith $"GitHub GraphQL query failed: {err}"

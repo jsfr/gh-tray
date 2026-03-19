@@ -9,11 +9,11 @@ open Microsoft.Extensions.Logging
 
 module Program =
     [<DllImport("kernel32.dll", EntryPoint = "AttachConsole")>]
-    extern bool private attachConsole(int dwProcessId)
+    extern bool private attachConsole(int _dwProcessId)
 
     [<EntryPoint; STAThread>]
     let main _argv =
-        attachConsole (-1) |> ignore // attach to parent console for log output
+        attachConsole -1 |> ignore // attach to parent console for log output
 
         let authResult = GhCli.validateAuth () |> Async.RunSynchronously
 
@@ -23,23 +23,23 @@ module Program =
             eprintfn "Please run 'gh auth login' first."
             1
         | Ok() ->
-            Application.SetColorMode(SystemColorMode.System)
+            Application.SetColorMode SystemColorMode.System
             Application.EnableVisualStyles()
-            Application.SetCompatibleTextRenderingDefault(false)
-            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) |> ignore
+            Application.SetCompatibleTextRenderingDefault false
+            Application.SetHighDpiMode HighDpiMode.PerMonitorV2 |> ignore
 
             let pollInterval =
-                match Environment.GetEnvironmentVariable("GH_TRAY_POLL_INTERVAL") with
-                | null -> TimeSpan.FromMinutes(2.0)
+                match Environment.GetEnvironmentVariable "GH_TRAY_POLL_INTERVAL" with
+                | null -> TimeSpan.FromMinutes 2.0
                 | v ->
-                    match Int32.TryParse(v) with
+                    match Int32.TryParse v with
                     | true, seconds -> TimeSpan.FromSeconds(float seconds)
                     | false, _ ->
                         eprintfn "Invalid GH_TRAY_POLL_INTERVAL: %s, using default 120s" v
-                        TimeSpan.FromMinutes(2.0)
+                        TimeSpan.FromMinutes 2.0
 
             let logLevel =
-                match Environment.GetEnvironmentVariable("GH_TRAY_LOG_LEVEL") with
+                match Environment.GetEnvironmentVariable "GH_TRAY_LOG_LEVEL" with
                 | null -> LogLevel.Information
                 | v ->
                     match Enum.TryParse<LogLevel>(v, true) with
@@ -54,11 +54,11 @@ module Program =
                     .ConfigureLogging(fun logging ->
                         logging.ClearProviders() |> ignore
                         logging.AddConsole() |> ignore
-                        logging.SetMinimumLevel(logLevel) |> ignore)
+                        logging.SetMinimumLevel logLevel |> ignore)
                     .ConfigureServices(fun services ->
                         services.AddSingleton<IGitHubClient>(GhCliClient()) |> ignore
                         services.AddSingleton<TrayApp>() |> ignore
-                        services.AddSingleton<PollerOptions>({ PollInterval = pollInterval }) |> ignore
+                        services.AddSingleton<PollerOptions> { PollInterval = pollInterval } |> ignore
                         services.AddSingleton<PullRequestPoller>() |> ignore
 
                         services.AddHostedService<PullRequestPoller>(fun sp ->
@@ -75,7 +75,7 @@ module Program =
             tray.SetLoading()
 
             let hotkeyBinding =
-                match Environment.GetEnvironmentVariable("GH_TRAY_HOTKEY") with
+                match Environment.GetEnvironmentVariable "GH_TRAY_HOTKEY" with
                 | null -> "Ctrl+Alt+Shift+G"
                 | v -> v
 

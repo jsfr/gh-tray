@@ -12,18 +12,18 @@ open Microsoft.Win32
 
 module private NativeMenu =
     [<DllImport("user32.dll")>]
-    extern bool SetForegroundWindow(IntPtr hWnd)
+    extern bool SetForegroundWindow(IntPtr _hWnd)
 
 module private ThemeDetection =
     let isSystemDarkTheme () =
         try
             use key =
-                Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+                Registry.CurrentUser.OpenSubKey @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
 
             match key with
             | null -> false
             | k ->
-                match k.GetValue("SystemUsesLightTheme") with
+                match k.GetValue "SystemUsesLightTheme" with
                 | :? int as v -> v = 0
                 | _ -> false
         with _ ->
@@ -88,7 +88,10 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                 override _.ImageMarginGradientEnd = MenuColors.background isDark }
 
         { new ToolStripProfessionalRenderer(colorTable) with
-            override _.OnRenderItemText(e) =
+            /// <summary></summary>
+            /// <param name="e"></param>
+            /// <returns></returns>
+            override _.OnRenderItemText e =
                 e.Graphics.TextRenderingHint <- Text.TextRenderingHint.ClearTypeGridFit
 
                 match e.Item.Tag with
@@ -99,7 +102,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                     TextRenderer.DrawText(e.Graphics, prefix, boldFont, e.TextRectangle.Location, color)
                     let titleX = e.TextRectangle.X + prefixSize.Width
                     TextRenderer.DrawText(e.Graphics, title, e.Item.Font, Point(titleX, e.TextRectangle.Y), color)
-                | _ -> base.OnRenderItemText(e) }
+                | _ -> base.OnRenderItemText e }
 
     let applyMenuTheme (isDark: bool) =
         contextMenu.Renderer <- createRenderer isDark
@@ -128,10 +131,10 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             match e.KeyCode with
             | Keys.J ->
                 e.Handled <- true
-                SendKeys.SendWait("{DOWN}")
+                SendKeys.SendWait "{DOWN}"
             | Keys.K ->
                 e.Handled <- true
-                SendKeys.SendWait("{UP}")
+                SendKeys.SendWait "{UP}"
             | _ -> ())
 
     let notifyIcon = new NotifyIcon(Visible = true, ContextMenuStrip = contextMenu)
@@ -150,10 +153,10 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
     let createIcon (text: string) (isDark: bool) : Icon =
         let size = 32
         let bmp = new Bitmap(size, size)
-        use g = Graphics.FromImage(bmp)
+        use g = Graphics.FromImage bmp
         g.SmoothingMode <- Drawing2D.SmoothingMode.AntiAlias
         g.TextRenderingHint <- Text.TextRenderingHint.AntiAliasGridFit
-        g.Clear(Color.Transparent)
+        g.Clear Color.Transparent
 
         let bgColor = if isDark then Color.White else Color.FromArgb(60, 60, 60)
 
@@ -184,7 +187,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         | _ -> None
 
     let repoName (nameWithOwner: string) =
-        match nameWithOwner.IndexOf('/') with
+        match nameWithOwner.IndexOf '/' with
         | -1 -> nameWithOwner
         | i -> nameWithOwner.Substring(i + 1)
 
@@ -197,7 +200,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
         let item = new ToolStripLabel(text, IsLink = false)
         item.Font <- new Font(item.Font, FontStyle.Bold)
         item.ForeColor <- MenuColors.foreground (isDark ())
-        contextMenu.Items.Add(item) |> ignore
+        contextMenu.Items.Add item |> ignore
 
     let addPrItem (pr: PullRequest) =
         let prefix = $"%s{repoName pr.Repository}#%d{pr.Number} "
@@ -213,7 +216,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             item.ForeColor <- MenuColors.grayText (isDark ())
 
         item.Click.Add(fun _ -> Process.Start(ProcessStartInfo(pr.Url, UseShellExecute = true)) |> ignore)
-        contextMenu.Items.Add(item) |> ignore
+        contextMenu.Items.Add item |> ignore
 
     let addSection (header: string) (prs: PullRequest list) =
         match prs with
@@ -225,7 +228,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
 
     let postToUiThread (action: unit -> unit) =
         if marshalControl.InvokeRequired then
-            marshalControl.BeginInvoke(Action(action)) |> ignore
+            marshalControl.BeginInvoke(Action action) |> ignore
         else
             action ()
 
@@ -256,14 +259,14 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             if e.Button = MouseButtons.Left then
                 showContextMenu |> Option.iter (fun m -> m.Invoke(notifyIcon, null) |> ignore))
 
-    do SystemEvents.UserPreferenceChanged.AddHandler(themeChangedHandler)
+    do SystemEvents.UserPreferenceChanged.AddHandler themeChangedHandler
 
     member _.SetLoading() =
         currentDisplayText <- "..."
         notifyIcon.Icon <- createIcon currentDisplayText (currentTheme ())
         notifyIcon.Text <- "gh-tray: loading..."
 
-    member _.Update(group: PullRequestGroup, pollInterval: TimeSpan) =
+    member _.Update(group: PullRequestGroup, _pollInterval: TimeSpan) =
         let doUpdate () =
             let count = PullRequestGroup.totalCount group
             currentDisplayText <- (string: int -> string) count
@@ -281,12 +284,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
             let now = DateTime.Now
             lastUpdated <- Some now
             isStale <- false
-            let timestamp = now.ToString("HH:mm:ss")
-            let tsItem = new ToolStripLabel($"Last updated: %s{timestamp}")
+            let timestamp = now.ToString "HH:mm:ss"
+            let tsItem = new ToolStripLabel $"Last updated: %s{timestamp}"
             tsItem.ForeColor <- MenuColors.grayText (isDark ())
-            contextMenu.Items.Add(tsItem) |> ignore
+            contextMenu.Items.Add tsItem |> ignore
 
-            let autoStartItem = new ToolStripMenuItem("Start with Windows")
+            let autoStartItem = new ToolStripMenuItem "Start with Windows"
             autoStartItem.Checked <- AutoStart.isEnabled ()
 
             autoStartItem.Click.Add(fun _ ->
@@ -294,12 +297,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
                 AutoStart.setEnabled newState
                 autoStartItem.Checked <- newState)
 
-            contextMenu.Items.Add(autoStartItem) |> ignore
+            contextMenu.Items.Add autoStartItem |> ignore
 
             contextMenu.Items.Add(new ToolStripSeparator()) |> ignore
-            let quitItem = new ToolStripMenuItem("Quit")
+            let quitItem = new ToolStripMenuItem "Quit"
             quitItem.Click.Add(fun _ -> lifetime.StopApplication())
-            contextMenu.Items.Add(quitItem) |> ignore
+            contextMenu.Items.Add quitItem |> ignore
 
         postToUiThread doUpdate
 
@@ -314,7 +317,7 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
 
                     match item.Text |> Option.ofObj with
                     | Some text when text.StartsWith("Last updated:", StringComparison.Ordinal) ->
-                        let timeStr = ts.ToString("HH:mm:ss")
+                        let timeStr = ts.ToString "HH:mm:ss"
                         item.Text <- $"\u26A0 Last updated: %s{timeStr}"
                     | _ -> ()
             | _ -> ()
@@ -324,12 +327,12 @@ type TrayApp(lifetime: IHostApplicationLifetime) =
     member _.ShowMenuAtCursor() =
         postToUiThread (fun () ->
             refreshIconIfThemeChanged ()
-            NativeMenu.SetForegroundWindow(marshalControl.Handle) |> ignore
-            contextMenu.Show(Cursor.Position))
+            NativeMenu.SetForegroundWindow marshalControl.Handle |> ignore
+            contextMenu.Show Cursor.Position)
 
     interface IDisposable with
         member _.Dispose() =
-            SystemEvents.UserPreferenceChanged.RemoveHandler(themeChangedHandler)
+            SystemEvents.UserPreferenceChanged.RemoveHandler themeChangedHandler
             notifyIcon.Visible <- false
             notifyIcon.Dispose()
             contextMenu.Dispose()

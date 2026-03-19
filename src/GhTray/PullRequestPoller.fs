@@ -24,7 +24,7 @@ type PullRequestPoller(client: IGitHubClient, tray: TrayApp, logger: ILogger<Pul
                     while not ct.IsCancellationRequested do
                         try
                             eprintfn "[gh-tray] Fetching PRs..."
-                            let! group = client.FetchPullRequests(username) |> Async.StartAsTask
+                            let! group = client.FetchPullRequests username |> Async.StartAsTask
 
                             let count = PullRequestGroup.totalCount group
                             eprintfn "[gh-tray] Fetched %d PRs" count
@@ -43,5 +43,5 @@ type PullRequestPoller(client: IGitHubClient, tray: TrayApp, logger: ILogger<Pul
         }
 
         member _.StopAsync(_ct: CancellationToken) =
-            logger.LogInformation("Stopping PR poller")
+            logger.LogInformation "Stopping PR poller"
             Task.CompletedTask

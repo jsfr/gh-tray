@@ -14,18 +14,13 @@ module EmojiRenderer =
     let private dwFactory = DWrite.DWriteCreateFactory<IDWriteFactory>()
     let private wicFactory = new IWICImagingFactory2()
 
-    let private cache = System.Collections.Generic.Dictionary<string, Bitmap>()
+    let private cache = Collections.Generic.Dictionary<string, Bitmap>()
 
     let private renderToBitmap (emoji: string) (size: int) : Bitmap =
         let usize = uint32 size
 
         let wicBitmap =
-            wicFactory.CreateBitmap(
-                usize,
-                usize,
-                Vortice.WIC.PixelFormat.Format32bppPBGRA,
-                BitmapCreateCacheOption.CacheOnLoad
-            )
+            wicFactory.CreateBitmap(usize, usize, PixelFormat.Format32bppPBGRA, BitmapCreateCacheOption.CacheOnLoad)
 
         let rtProps =
             RenderTargetProperties(
@@ -72,11 +67,11 @@ module EmojiRenderer =
             bmp.LockBits(Rectangle(0, 0, size, size), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb)
 
         Marshal.Copy(pixels, 0, bmpData.Scan0, int bufferSize)
-        bmp.UnlockBits(bmpData)
+        bmp.UnlockBits bmpData
         bmp
 
     let render (emoji: string) : Bitmap =
-        match cache.TryGetValue(emoji) with
+        match cache.TryGetValue emoji with
         | true, bmp -> bmp
         | false, _ ->
             let bmp = renderToBitmap emoji 20

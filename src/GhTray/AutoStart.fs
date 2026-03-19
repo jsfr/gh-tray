@@ -10,11 +10,11 @@ module AutoStart =
 
     let isEnabled () =
         try
-            use key = Registry.CurrentUser.OpenSubKey(keyPath)
+            use key = Registry.CurrentUser.OpenSubKey keyPath
 
             match key with
             | null -> false
-            | k -> not (isNull (k.GetValue(valueName)))
+            | k -> not (isNull (k.GetValue valueName))
         with _ ->
             false
 

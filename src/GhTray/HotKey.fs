@@ -22,7 +22,7 @@ module HotKeyParser =
 
     let tryParse (hotkey: string) : (uint32 * Keys) option =
         let parts =
-            hotkey.Split('+')
+            hotkey.Split '+'
             |> Array.map (fun s -> s.Trim())
             |> Array.filter (fun s -> s.Length > 0)
 
@@ -68,10 +68,10 @@ module private NativeHotKey =
     let HotkeyId = 1
 
     [<DllImport("user32.dll", SetLastError = true)>]
-    extern bool RegisterHotKey(IntPtr hWnd, int id, uint32 fsModifiers, uint32 vk)
+    extern bool RegisterHotKey(IntPtr _hWnd, int _id, uint32 _fsModifiers, uint32 _vk)
 
     [<DllImport("user32.dll", SetLastError = true)>]
-    extern bool UnregisterHotKey(IntPtr hWnd, int id)
+    extern bool UnregisterHotKey(IntPtr _hWnd, int _id)
 
 type GlobalHotKey(modifiers: uint32, key: Keys, callback: unit -> unit) =
     inherit NativeWindow()
@@ -85,7 +85,7 @@ type GlobalHotKey(modifiers: uint32, key: Keys, callback: unit -> unit) =
 
     member _.IsRegistered = registered
 
-    override _.WndProc(m) =
+    override _.WndProc m =
         if m.Msg = NativeHotKey.WmHotkey && int m.WParam = NativeHotKey.HotkeyId then
             callback ()
         else
