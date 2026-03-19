@@ -4,8 +4,16 @@
 repo = "local"
 
 [[repos.hooks]]
-id = "fantomas"
-name = "fantomas"
+id = "check-fmt"
+name = "check-fmt"
 language = "system"
-entry = "dotnet fantomas"
-files = '\.fs$'
+entry = "just check-fmt"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "check"
+name = "check"
+language = "system"
+entry = "just check"
+stages = ["pre-push"]
+pass_filenames = false
