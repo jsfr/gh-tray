@@ -35,7 +35,7 @@ jobs:
 
       - name: Build installer
         shell: cmd
-        run: just build-installer ${{ steps.version.outputs.version }}
+        run: iscc /DAppVersion=${{ steps.version.outputs.version }} installer\gh-tray.iss
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
