@@ -73,6 +73,11 @@ module Program =
                     .ConfigureLogging(fun logging ->
                         logging.ClearProviders() |> ignore
                         logging.AddConsole() |> ignore
+
+                        match config.LogFile with
+                        | Some path -> logging.AddProvider(new FileLoggerProvider(path, logLevel)) |> ignore
+                        | None -> ()
+
                         logging.SetMinimumLevel logLevel |> ignore)
                     .ConfigureServices(fun services ->
                         services.AddSingleton<IGitHubClient>(GhCliClient ghToken) |> ignore

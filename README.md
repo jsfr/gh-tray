@@ -58,7 +58,8 @@ Configuration is read from `%APPDATA%\gh-tray\config.json`. All fields are optio
   "account": "my-github-account",
   "pollInterval": 120,
   "logLevel": "Information",
-  "hotkey": "Ctrl+Alt+Shift+G"
+  "hotkey": "Ctrl+Alt+Shift+G",
+  "logFile": "C:\\Users\\me\\AppData\\Roaming\\gh-tray\\gh-tray.log"
 }
 ```
 
@@ -68,6 +69,7 @@ Configuration is read from `%APPDATA%\gh-tray\config.json`. All fields are optio
 | `pollInterval` | int | `120` | Polling interval in seconds |
 | `logLevel` | string | `Information` | Log level: `Debug`, `Information`, `Warning`, `Error` |
 | `hotkey` | string | `Ctrl+Alt+Shift+G` | Global hotkey binding |
+| `logFile` | string | (none) | Path to a log file; when set, logs are written to this file |
 
 ### Environment variable overrides
 

@@ -14,6 +14,7 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Config.fs" />
+    <Compile Include="FileLogger.fs" />
     <Compile Include="GitHubClient.fs" />
     <Compile Include="EmojiRenderer.fs" />
     <Compile Include="AutoStart.fs" />

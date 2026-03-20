@@ -9,20 +9,23 @@ type AppConfig =
     { Account: string option
       PollInterval: int
       LogLevel: string
-      Hotkey: string }
+      Hotkey: string
+      LogFile: string option }
 
 module Config =
     let defaultConfig =
         { Account = None
           PollInterval = 120
           LogLevel = "Information"
-          Hotkey = "Ctrl+Alt+Shift+G" }
+          Hotkey = "Ctrl+Alt+Shift+G"
+          LogFile = None }
 
     type private ConfigFile =
         { Account: string option
           PollInterval: int option
           LogLevel: string option
-          Hotkey: string option }
+          Hotkey: string option
+          LogFile: string option }
 
     let private options =
         JsonFSharpOptions
@@ -34,7 +37,8 @@ module Config =
         { Account = cf.Account
           PollInterval = cf.PollInterval |> Option.defaultValue defaultConfig.PollInterval
           LogLevel = cf.LogLevel |> Option.defaultValue defaultConfig.LogLevel
-          Hotkey = cf.Hotkey |> Option.defaultValue defaultConfig.Hotkey }
+          Hotkey = cf.Hotkey |> Option.defaultValue defaultConfig.Hotkey
+          LogFile = cf.LogFile }
 
     let configPath () =
         let appData = Environment.GetFolderPath Environment.SpecialFolder.ApplicationData
