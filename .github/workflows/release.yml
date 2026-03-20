@@ -34,6 +34,7 @@ jobs:
         run: echo "C:/Program Files (x86)/Inno Setup 6" >> "$GITHUB_PATH"
 
       - name: Build installer
+        shell: cmd
         run: just build-installer ${{ steps.version.outputs.version }}
 
       - name: Upload artifact
