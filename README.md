@@ -14,6 +14,9 @@ Each PR shows status indicators for draft, merge conflicts, CI status, and revie
 
 - Polls GitHub for open PRs involving you
 - Groups and displays PRs in a context menu from the system tray
+- Multi-account support — select which `gh` CLI account to use
+- JSON config file with optional environment variable overrides
+- File logging for troubleshooting when not running from a terminal
 - Dark/light theme detection with automatic switching
 - Global hotkey to open the menu at cursor position (default: `Ctrl+Alt+Shift+G`)
 - Optional auto-start with Windows
