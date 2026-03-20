@@ -7,7 +7,7 @@ open System.Diagnostics
 open System.Text.Json
 
 module GhCli =
-    let runGh (args: string list) : Async<Result<string, string>> = async {
+    let runGh (token: string option) (args: string list) : Async<Result<string, string>> = async {
         let psi = ProcessStartInfo "gh"
 
         for arg in args do
@@ -17,6 +17,10 @@ module GhCli =
         psi.RedirectStandardError <- true
         psi.UseShellExecute <- false
         psi.CreateNoWindow <- true
+
+        match token with
+        | Some t -> psi.Environment["GH_TOKEN"] <- t
+        | None -> ()
 
         match Process.Start psi with
         | null -> return Error "Failed to start gh process"
@@ -32,8 +36,8 @@ module GhCli =
                 return Error(stderr.Trim())
     }
 
-    let validateAuth () : Async<Result<unit, string>> = async {
-        match! runGh [ "auth"; "status" ] with
+    let validateAuth (token: string option) : Async<Result<unit, string>> = async {
+        match! runGh token [ "auth"; "status" ] with
         | Ok _ -> return Ok()
         | Error err -> return Error err
     }
@@ -195,10 +199,10 @@ module GraphQL =
           ReviewRequested = List.rev reviewRequested
           Involved = List.rev involved }
 
-type GhCliClient() =
+type GhCliClient(token: string option) =
     interface IGitHubClient with
         member _.GetUsername() = async {
-            match! GhCli.runGh [ "api"; "user"; "--jq"; ".login" ] with
+            match! GhCli.runGh token [ "api"; "user"; "--jq"; ".login" ] with
             | Ok username -> return username
             | Error err -> return failwith $"Failed to get GitHub username: {err}"
         }
@@ -214,7 +218,7 @@ type GhCliClient() =
                   "-f"
                   $"searchQuery=%s{searchQuery}" ]
 
-            match! GhCli.runGh args with
+            match! GhCli.runGh token args with
             | Ok json ->
                 let doc = JsonDocument.Parse json
 

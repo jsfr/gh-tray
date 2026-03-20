@@ -7,11 +7,13 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Core" />
+    <PackageReference Include="FSharp.SystemTextJson" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Vortice.Direct2D1" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Types.fs" />
+    <Compile Include="Config.fs" />
     <Compile Include="GitHubClient.fs" />
     <Compile Include="EmojiRenderer.fs" />
     <Compile Include="AutoStart.fs" />

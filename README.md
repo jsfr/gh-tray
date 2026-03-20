@@ -51,11 +51,33 @@ To uninstall:
 
 ## Configuration
 
-| Environment Variable | Description | Default |
-|---|---|---|
-| `GH_TRAY_POLL_INTERVAL` | Polling interval in seconds | `120` |
-| `GH_TRAY_LOG_LEVEL` | Log level (`Debug`, `Information`, `Warning`, etc.) | `Information` |
-| `GH_TRAY_HOTKEY` | Global hotkey binding (e.g. `Ctrl+Alt+G`) | `Ctrl+Alt+Shift+G` |
+Configuration is read from `%APPDATA%\gh-tray\config.json`. All fields are optional — missing fields use defaults.
+
+```json
+{
+  "account": "my-github-account",
+  "pollInterval": 120,
+  "logLevel": "Information",
+  "hotkey": "Ctrl+Alt+Shift+G"
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `account` | string | (system default) | `gh` CLI account name (as shown in `gh auth status`) |
+| `pollInterval` | int | `120` | Polling interval in seconds |
+| `logLevel` | string | `Information` | Log level: `Debug`, `Information`, `Warning`, `Error` |
+| `hotkey` | string | `Ctrl+Alt+Shift+G` | Global hotkey binding |
+
+### Environment variable overrides
+
+Environment variables override config file values when set:
+
+| Environment Variable | Overrides |
+|---|---|
+| `GH_TRAY_POLL_INTERVAL` | `pollInterval` |
+| `GH_TRAY_LOG_LEVEL` | `logLevel` |
+| `GH_TRAY_HOTKEY` | `hotkey` |
 
 ## Development
 

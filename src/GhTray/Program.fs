@@ -15,7 +15,22 @@ module Program =
     let main _argv =
         attachConsole -1 |> ignore // attach to parent console for log output
 
-        let authResult = GhCli.validateAuth () |> Async.RunSynchronously
+        let config = Config.load ()
+
+        let ghToken =
+            match config.Account with
+            | Some account ->
+                match
+                    GhCli.runGh None [ "auth"; "token"; "--user"; account ]
+                    |> Async.RunSynchronously
+                with
+                | Ok token -> Some token
+                | Error err ->
+                    eprintfn "Failed to get token for account '%s': %s" account err
+                    None
+            | None -> None
+
+        let authResult = GhCli.validateAuth ghToken |> Async.RunSynchronously
 
         match authResult with
         | Error err ->
@@ -30,23 +45,27 @@ module Program =
 
             let pollInterval =
                 match Environment.GetEnvironmentVariable "GH_TRAY_POLL_INTERVAL" with
-                | null -> TimeSpan.FromMinutes 2.0
+                | null -> config.PollInterval
                 | v ->
                     match Int32.TryParse v with
-                    | true, seconds -> TimeSpan.FromSeconds(float seconds)
+                    | true, seconds -> seconds
                     | false, _ ->
-                        eprintfn "Invalid GH_TRAY_POLL_INTERVAL: %s, using default 120s" v
-                        TimeSpan.FromMinutes 2.0
+                        eprintfn "Invalid GH_TRAY_POLL_INTERVAL: %s, using default %ds" v config.PollInterval
+                        config.PollInterval
+                |> float
+                |> TimeSpan.FromSeconds
+
+            let parseLogLevel (v: string) =
+                match Enum.TryParse<LogLevel>(v, true) with
+                | true, level -> level
+                | false, _ ->
+                    eprintfn "Invalid log level: %s, using default %s" v config.LogLevel
+                    LogLevel.Information
 
             let logLevel =
                 match Environment.GetEnvironmentVariable "GH_TRAY_LOG_LEVEL" with
-                | null -> LogLevel.Information
-                | v ->
-                    match Enum.TryParse<LogLevel>(v, true) with
-                    | true, level -> level
-                    | false, _ ->
-                        eprintfn "Invalid GH_TRAY_LOG_LEVEL: %s, using default Warning" v
-                        LogLevel.Warning
+                | null -> parseLogLevel config.LogLevel
+                | v -> parseLogLevel v
 
             let host =
                 Host
@@ -56,7 +75,7 @@ module Program =
                         logging.AddConsole() |> ignore
                         logging.SetMinimumLevel logLevel |> ignore)
                     .ConfigureServices(fun services ->
-                        services.AddSingleton<IGitHubClient>(GhCliClient()) |> ignore
+                        services.AddSingleton<IGitHubClient>(GhCliClient ghToken) |> ignore
                         services.AddSingleton<TrayApp>() |> ignore
                         services.AddSingleton<PollerOptions> { PollInterval = pollInterval } |> ignore
                         services.AddSingleton<PullRequestPoller>() |> ignore
@@ -76,7 +95,7 @@ module Program =
 
             let hotkeyBinding =
                 match Environment.GetEnvironmentVariable "GH_TRAY_HOTKEY" with
-                | null -> "Ctrl+Alt+Shift+G"
+                | null -> config.Hotkey
                 | v -> v
 
             let globalHotKey =

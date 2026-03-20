@@ -14,6 +14,15 @@
         "resolved": "10.1.201",
         "contentHash": "s5w9LWYurZ9yZdIppoIaYLkRadyT5s3u0wbQCb0J4bQd3ubIlIWQ3Nd5+ll1y3pv5OnTS373dP8T1S/BP46QXg=="
       },
+      "FSharp.SystemTextJson": {
+        "type": "Direct",
+        "requested": "[1.3.13, )",
+        "resolved": "1.3.13",
+        "contentHash": "znp8odpdkVGKVX0AvbhiXdmeMi0KJ+A4AyAQWSkfAEAe4Z4clRE+rVhrLnAGrFD1VEIUX2lsQ4o84ywpWZUSGw==",
+        "dependencies": {
+          "FSharp.Core": "4.7.0"
+        }
+      },
       "G-Research.FSharp.Analyzers": {
         "type": "Direct",
         "requested": "[0.22.0, )",
