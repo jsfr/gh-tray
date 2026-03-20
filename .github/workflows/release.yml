@@ -26,11 +26,27 @@ jobs:
       - name: Publish
         run: just publish ${{ steps.version.outputs.version }}
 
+      - name: Install InnoSetup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Add ISCC to PATH
+        shell: bash
+        run: echo "C:/Program Files (x86)/Inno Setup 6" >> "$GITHUB_PATH"
+
+      - name: Build installer
+        run: just build-installer ${{ steps.version.outputs.version }}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: gh-tray-win-x64
           path: src/GhTray/bin/Release/net10.0-windows/win-x64/publish/GhTray.exe
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gh-tray-installer
+          path: installer/output/gh-tray-${{ steps.version.outputs.version }}-win-x64-setup.exe
 
   release:
     needs: publish
@@ -68,11 +84,28 @@ jobs:
         with:
           name: gh-tray-win-x64
 
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gh-tray-installer
+
       - name: Rename artifact
         run: mv GhTray.exe gh-tray-win-x64.exe
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: gh-tray-win-x64.exe
+          files: |
+            gh-tray-win-x64.exe
+            gh-tray-*-win-x64-setup.exe
           body: ${{ steps.changelog.outputs.content }}
+
+  winget:
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: jsfr.gh-tray
+          installers-regex: 'gh-tray-.*-win-x64-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}

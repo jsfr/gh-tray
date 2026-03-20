@@ -25,7 +25,17 @@ Each PR shows status indicators for draft, merge conflicts, CI status, and revie
 
 ## Install
 
-Download the latest release from [GitHub Releases](https://github.com/jsfr/gh-tray/releases), or build and install locally:
+### winget
+
+```
+winget install jsfr.gh-tray
+```
+
+### Installer
+
+Download the latest `gh-tray-*-win-x64-setup.exe` from [GitHub Releases](https://github.com/jsfr/gh-tray/releases) and run it. The installer supports silent install with `/VERYSILENT /SUPPRESSMSGBOXES`.
+
+### Build from source
 
 ```powershell
 .\install.ps1
