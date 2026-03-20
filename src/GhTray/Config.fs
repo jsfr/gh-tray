@@ -25,9 +25,10 @@ module Config =
           Hotkey: string option }
 
     let private options =
-        let o = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
-        o.Converters.Add(JsonFSharpConverter())
-        o
+        JsonFSharpOptions
+            .Default()
+            .WithSkippableOptionFields()
+            .ToJsonSerializerOptions(PropertyNameCaseInsensitive = true)
 
     let private fromFile (cf: ConfigFile) : AppConfig =
         { Account = cf.Account
