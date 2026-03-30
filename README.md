@@ -10,6 +10,8 @@ PRs are grouped into three categories:
 
 Each PR shows status indicators for draft, merge conflicts, CI status, and review status using emoji icons.
 
+![Screenshot of gh-tray context menu](images/screenshot.png)
+
 ## Features
 
 - Polls GitHub for open PRs involving you
@@ -32,6 +34,13 @@ Each PR shows status indicators for draft, merge conflicts, CI status, and revie
 
 ```
 winget install jsfr.gh-tray
+```
+
+### Scoop
+
+```
+scoop bucket add gh-tray https://github.com/jsfr/gh-tray
+scoop install gh-tray
 ```
 
 ### Installer

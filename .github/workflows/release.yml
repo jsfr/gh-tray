@@ -110,3 +110,51 @@ jobs:
           identifier: jsfr.gh-tray
           installers-regex: 'gh-tray-.*-win-x64-setup\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
+
+  scoop:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Determine version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ github.ref_name }}" \
+            --pattern "gh-tray-win-x64.exe" \
+            --dir .
+
+      - name: Compute hash
+        id: hash
+        run: |
+          hash=$(sha256sum gh-tray-win-x64.exe | awk '{print $1}')
+          echo "sha256=$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Update Scoop manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          HASH: ${{ steps.hash.outputs.sha256 }}
+        run: |
+          jq \
+            --arg version "$VERSION" \
+            --arg hash "$HASH" \
+            '.version = $version | .hash = $hash | .url = "https://github.com/jsfr/gh-tray/releases/download/v" + $version + "/gh-tray-win-x64.exe#/gh-tray.exe"' \
+            bucket/gh-tray.json > bucket/gh-tray.json.tmp
+          mv bucket/gh-tray.json.tmp bucket/gh-tray.json
+
+      - name: Commit manifest update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/gh-tray.json
+          git diff --cached --quiet || git commit -m "chore: update scoop manifest for ${{ github.ref_name }}"
+          git push origin HEAD:main

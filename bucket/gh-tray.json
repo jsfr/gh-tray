@@ -1,0 +1,20 @@
+{
+    "version": "0.0.5",
+    "description": "A Windows system tray application that monitors your GitHub pull requests using the gh CLI",
+    "homepage": "https://github.com/jsfr/gh-tray",
+    "license": "MIT",
+    "url": "https://github.com/jsfr/gh-tray/releases/download/v0.0.5/gh-tray-win-x64.exe#/gh-tray.exe",
+    "hash": "",
+    "bin": "gh-tray.exe",
+    "shortcuts": [
+        ["gh-tray.exe", "gh-tray"]
+    ],
+    "checkver": "github",
+    "autoupdate": {
+        "url": "https://github.com/jsfr/gh-tray/releases/download/v$version/gh-tray-win-x64.exe#/gh-tray.exe",
+        "hash": {
+            "url": "https://github.com/jsfr/gh-tray/releases/download/v$version/gh-tray-win-x64.exe",
+            "mode": "download"
+        }
+    }
+}
