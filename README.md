@@ -30,11 +30,11 @@ Each PR shows status indicators for draft, merge conflicts, CI status, and revie
 
 ## Install
 
-### winget
+<!-- ### winget
 
 ```
 winget install jsfr.gh-tray
-```
+``` -->
 
 ### Scoop
 
